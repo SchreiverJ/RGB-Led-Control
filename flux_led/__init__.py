@@ -1427,6 +1427,7 @@ def main():
     # now we have our bulb list, perform same operation on all of them
     for info in bulb_info_list:
         try:
+            print (info['ipaddr'])
             bulb = WifiLedBulb(info['ipaddr'])
         except Exception as e:
             print("Unable to connect to bulb at [{}]: {}".format(info['ipaddr'],e))
