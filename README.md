@@ -1,3 +1,8 @@
+## RGB Led Control for Smart Things with Raspberry PI Rest Proxy
+### Installing on Raspberry PI
+
+sudo sh install.sh
+
 ### led_flux.py 
 
 This is a utility for controlling stand-alone Flux WiFi LED light bulbs.

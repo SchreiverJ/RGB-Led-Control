@@ -1,0 +1,10 @@
+[Unit]
+Description=RGB Light Control Service
+
+[Service]
+ExecStart=/opt/rgbcontrol/web.py
+StandardOutput=null
+
+[Install]
+WantedBy=multi-user.target
+Alias=rgbcontrol.service

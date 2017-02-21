@@ -1,0 +1,227 @@
+/**
+ *  Raspberry Pi RGB LED Proxy
+ *
+ *  FORK OF
+ *  <https://github.com/nicholaswilde/smartthings/blob/master/device-types/raspberry-pi/raspberrypi.py>
+ *
+ *  Copyright 2017 Jacob Schreiver
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ *  in compliance with the License. You may obtain a copy of the License at:
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
+ *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
+ *  for the specific language governing permissions and limitations under the License.
+ *
+ */
+ 
+import groovy.json.JsonSlurper
+
+preferences {
+        input("ip", "string", title:"IP Address", description: "192.168.116.51", required: true, displayDuringSetup: true)
+        input("port", "string", title:"Port", description: "8000", defaultValue: 8000 , required: true, displayDuringSetup: true)
+        input("username", "string", title:"Username", description: "webiopi", required: true, displayDuringSetup: true)
+        input("password", "password", title:"Password", description: "Password", required: true, displayDuringSetup: true)
+}
+
+metadata {	definition (name: "Raspberry Pi RGB LED Proxy", namespace: "SchreiverJ", author: "Jacob Schreiver") {
+		capability "Polling"
+		capability "Refresh"
+        capability "Switch"
+        capability "Sensor"
+        capability "Actuator"
+        capability "Color Control"
+        
+        command "restart"
+        command "setColor"
+	}
+
+	simulator {
+		// TODO: define status and reply messages here
+	}
+
+	tiles {
+        standardTile("switch", "device.switch", width: 1, height: 1, canChangeIcon: true) {
+			state "off", label: 'off', action:"switch.on", icon: "st.Electronics.electronics18", backgroundColor: "#ffffff", nextState: "on"
+			state "on", label: 'on', action:"switch.off", icon: "st.Electronics.electronics18", backgroundColor: "#79b821", nextState: "off"
+		}
+        standardTile("restart", "device.restart", inactiveLabel: false, decoration: "flat") {
+        	state "default", action:"restart", label: "Restart", displayName: "Restart"
+        }
+        standardTile("refresh", "device.refresh", inactiveLabel: false, decoration: "flat") {
+        	state "default", action:"refresh.refresh", icon: "st.secondary.refresh"
+        }
+        
+		valueTile("currentColor", "device.color") {
+			state "color", label: '${currentValue}', defaultState: true
+		}
+        controlTile("rgbSelector", "device.color", "color", width: 3, height: 3,
+            inactiveLabel: false) {
+    		state "color", action: "color control.setColor"
+        }
+
+        main "switch"
+        details(["switch", "restart","currentColor", "refresh","rgbSelector"])
+    }
+}
+
+// ------------------------------------------------------------------
+
+
+// parse events into attributes
+def parse(String description) {
+    def map = [:]
+    def descMap = parseDescriptionAsMap(description)
+    //log.debug descMap
+    def body = new String(descMap["body"].decodeBase64())
+    //log.debug "body: ${body}"
+    def slurper = new JsonSlurper()
+    log.debug "body: ${body}"
+    def result = slurper.parseText(body)
+    log.debug "result: ${result}"
+
+    if (result.containsKey("state")) {
+    	sendEvent(name: "switch", value: result.state)
+    }
+    
+    if (result.containsKey("color")) {
+    	sendEvent(name: "color", value: result.color)
+    }
+   
+  
+}
+
+def on() {
+log.debug "Executing 'on'"
+    def uri = "/on"
+    postAction(uri)
+}
+
+def off() {
+log.debug "Executing 'off'"
+    def uri = "/off"
+    postAction(uri)
+}
+
+// handle commands
+def setColor(value) {
+	log.debug "setting color: $value"
+    if (value.hex) { 
+    sendEvent(name: "color", value: value.hex) 
+    return sendColor(value.hex)
+    }
+    if (value.hue) { sendEvent(name: "hue", value: value.hue) }
+    if (value.saturation) { sendEvent(name: "saturation", value: value.saturation) }
+  
+}
+
+def setSaturation(percent) {
+	log.debug "Executing 'setSaturation'"
+	sendEvent(name: "saturation", value: percent)
+}
+
+def setHue(percent) {
+	log.debug "Executing 'setHue'"
+	sendEvent(name: "hue", value: percent)
+}
+
+def poll() {
+	log.debug "Executing 'poll'"
+    getRPiData()
+}
+
+def refresh() {
+	sendEvent(name: "switch", value: "off")
+	log.debug "Executing 'refresh'"
+    getRPiData()
+}
+
+
+
+// Get CPU percentage reading
+private getRPiData() {
+	def uri = "/macros/getData"
+    postAction(uri)
+}
+
+private sendColor(value) {
+    def c = value.substring(1)
+	def uri = "/macros/set?color=$c"
+    postAction(uri)
+}
+
+// ------------------------------------------------------------------
+
+private postAction(uri){
+  setDeviceNetworkId(ip,port)  
+  
+  def userpass = encodeCredentials(username, password)
+  
+  def headers = getHeader(userpass)
+  
+  def hubAction = new physicalgraph.device.HubAction(
+    method: "GET",
+    path: uri,
+    headers: headers
+  )//,delayAction(1000), refresh()]
+  log.debug("Executing hubAction on " + getHostAddress() + uri)
+  //log.debug hubAction
+  hubAction    
+}
+
+// ------------------------------------------------------------------
+// Helper methods
+// ------------------------------------------------------------------
+
+def parseDescriptionAsMap(description) {
+	description.split(",").inject([:]) { map, param ->
+		def nameAndValue = param.split(":")
+		map += [(nameAndValue[0].trim()):nameAndValue[1].trim()]
+	}
+}
+
+private encodeCredentials(username, password){
+	log.debug "Encoding credentials"
+	def userpassascii = "${username}:${password}"
+    def userpass = "Basic " + userpassascii.encodeAsBase64().toString()
+    //log.debug "ASCII credentials are ${userpassascii}"
+    //log.debug "Credentials are ${userpass}"
+    return userpass
+}
+
+private getHeader(userpass){
+	log.debug "Getting headers"
+    def headers = [:]
+    headers.put("HOST", getHostAddress())
+    headers.put("Authorization", userpass)
+    //log.debug "Headers are ${headers}"
+    return headers
+}
+
+private delayAction(long time) {
+	new physicalgraph.device.HubAction("delay $time")
+}
+
+private setDeviceNetworkId(ip,port){
+  	def iphex = convertIPtoHex(ip)
+  	def porthex = convertPortToHex(port)
+  	device.deviceNetworkId = "$iphex:$porthex"
+  	log.debug "Device Network Id set to ${iphex}:${porthex}"
+}
+
+private getHostAddress() {
+	return "${ip}:${port}"
+}
+
+private String convertIPtoHex(ipAddress) { 
+    String hex = ipAddress.tokenize( '.' ).collect {  String.format( '%02x', it.toInteger() ) }.join()
+    return hex
+
+}
+
+private String convertPortToHex(port) {
+	String hexport = port.toString().format( '%04x', port.toInteger() )
+    return hexport
+}

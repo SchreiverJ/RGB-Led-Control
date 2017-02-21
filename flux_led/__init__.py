@@ -494,6 +494,7 @@ class WifiLedBulb():
         try:
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self._socket.settimeout(self.timeout)
+            
             self._socket.connect((self.ipaddr, self.port))
         except socket.error:
             if retry < 1:
