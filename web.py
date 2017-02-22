@@ -37,19 +37,21 @@ def setState(bulb, json_data):
         red = int(json_data['red'])
         green = int(json_data['green'])
         blue = int(json_data['blue'])
+
         if not bulb.isOn():
             bulb.turnOn()
+            time.sleep(.1)
+            bulb.update_state()
         bulb.setRgb(red,green,blue)
-        time.sleep(1)
+        time.sleep(.1)
         bulb.update_state()
         
     if 'state' in json_data:
         if 'on' in json_data['state']:
-            print ("Turning On")
             bulb.turnOn()
         else:
             bulb.turnOff() 
-        time.sleep(1)
+        time.sleep(.1)
         bulb.update_state()
 
     return bulb
@@ -100,6 +102,31 @@ def set():
     dict['green'] = hexToInt(color[2:4])
     dict['blue'] = hexToInt(color[4:6])
     bulb = getBulb()
+    setState(bulb, dict)
+    return getBulbState(bulb)
+
+#For having buttons flip individual colors
+@app.route("/macros/toggle")
+def toggle():
+    color = request.args.get('color')
+    bulb = getBulb()
+    bulb.update_state()
+    if bulb.isOn():
+        c = bulb.getRgb()
+    else:
+        c = (0,0,0)
+    dict = {}
+    
+    dict['red'] = c[0]
+    dict['green'] = c[1]
+    dict['blue'] = c[2]
+    if dict[color] > 127:
+        dict[color] = 0
+    else:
+        dict[color] = 255
+    if dict['red'] == 0 and dict['green'] == 0 and dict['blue'] == 0:
+        dict['state'] = 'off'
+
     setState(bulb, dict)
     return getBulbState(bulb)
 
