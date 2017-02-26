@@ -106,9 +106,7 @@ def set():
     return getBulbState(bulb)
 
 #For having buttons flip individual colors
-@app.route("/macros/toggle")
-def toggle():
-    color = request.args.get('color')
+def toggleColor(color):
     bulb = getBulb()
     bulb.update_state()
     if bulb.isOn():
@@ -129,6 +127,23 @@ def toggle():
 
     setState(bulb, dict)
     return getBulbState(bulb)
+
+
+@app.route("/macros/toggle")
+def toggle():
+    color = request.args.get('color')
+    return toggleColor(color)
+
+@app.route("/macros/button")
+def buttonPressed():
+    num = request.args.get('num')
+    if num == '0':
+        return toggleColor('red')
+    if num == '1':
+        return toggleColor('green')
+    if num == '2':
+        return toggleColor('blue')
+    return 'ok'
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000 ,debug=True)
